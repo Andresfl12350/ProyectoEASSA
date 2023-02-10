@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="rptSubIngresosNoImponibles" language="groovy" pageWidth="595" pageHeight="842" columnWidth="595" leftMargin="0" rightMargin="0" topMargin="0" bottomMargin="0" uuid="2452569a-2065-4476-b2db-89ec33c914f9">
+	<property name="ireport.zoom" value="1.3310000000000004"/>
+	<property name="ireport.x" value="0"/>
+	<property name="ireport.y" value="0"/>
+	<parameter name="P_DNMPN_CODIGO" class="java.lang.String">
+		<defaultValueExpression><![CDATA[]]></defaultValueExpression>
+	</parameter>
+	<parameter name="P_DMPER_NUMERO_ROL" class="java.lang.String">
+		<defaultValueExpression><![CDATA[]]></defaultValueExpression>
+	</parameter>
+	<queryString>
+		<![CDATA[SELECT
+	ROL,
+	C1.DNMNC_VALOR,
+	C1.DNMRU_ABREVIATURA
+FROM (
+SELECT
+       P.DMPER_NUMERO_ROL ROL,
+       P.DMPER_NOMBRE_PRIMERO ||' '||P.DMPER_NOMBRE_SEGUNDO||' '||P.DMPER_APELLIDO_PATER NOMBRE,
+       (SELECT C.DMCAR_DESCRIPCION ||' '||ROOTSISGERH.PKG_UTILS1.SPLIT(CES.DMCES_LTR_SECUENCIA,2,'-')
+       FROM ROOTSISGERH.DRI_MA_CARGO C ,ROOTSISGERH.DRI_MA_ASIG_CARGO AC,ROOTSISGERH.DRI_MA_CARGO_ESCALA CES
+       WHERE C.DMCAR_CODIGO = AC.DMCAR_CODIGO
+       AND AC.DMACA_CODIGO =(ROOTSISGERH.PKG_UTIL_NOMINA.F_GET_CARGO_FIJO(NC.DMPER_CODIGO))
+       AND CES.DMCES_CODIGO = AC.DMCES_CODIGO  )CARGO,
+       NC.DNMNC_VALOR,
+       R.DNMRU_ABREVIATURA ,
+       CASE R.DNMRU_TIPO WHEN 0 THEN 'INCREMENTO '  WHEN 1 THEN 'DECREMENTO ' WHEN 2 THEN 'NO ESPECIFICADO ' END  TIPO
+FROM ROOTSISGERH.DRI_NOM_NOMINA_CALCUL NC
+INNER JOIN ROOTSISGERH.DRI_NOM_RUBRO R        ON   R.DNMRU_CODIGO = NC.DNMRU_CODIGO AND R.DNMRU_ESTADO = 1 AND R.DNMRU_CODIGO != 'RUB1' AND R.DNMRU_TIPO = 0
+INNER JOIN ROOTSISGERH.DRI_NOM_PAGO_NOMINA PN ON  NC.DNMPN_CODIGO =  PN.DNMPN_CODIGO
+INNER JOIN ROOTSISGERH.DRI_MA_PERSONAL P      ON   P.DMPER_CODIGO = NC.DMPER_CODIGO AND P.DMPER_ESTADO = 1
+INNER JOIN ROOTSISGERH.DRI_HTR_PERSON_CARGO HCA ON (P.DMPER_CODIGO = HCA.DMPER_CODIGO AND HCA.DHPCA_ESTADO =1
+            AND (HCA.DHPCA_FECHA_FIN_ASIG IS NULL OR
+                TO_DATE(EXTRACT(MONTH FROM TRUNC(HCA.DHPCA_FECHA_FIN_ASIG))||'/'||EXTRACT(YEAR FROM TRUNC(HCA.DHPCA_FECHA_FIN_ASIG)),'MM/YYYY')>=
+                TO_DATE(PN.DNMPN_MES||'/'||PN.DNMPN_ANIO,'MM/YYYY')
+            )
+            AND HCA.DHPCA_FECHA_INI_ASIG IS NOT NULL  AND
+                TO_DATE(EXTRACT(MONTH FROM TRUNC(HCA.DHPCA_FECHA_INI_ASIG))||'/'||EXTRACT(YEAR FROM TRUNC(HCA.DHPCA_FECHA_INI_ASIG)),'MM/YYYY')<=
+                TO_DATE(PN.DNMPN_MES||'/'||PN.DNMPN_ANIO,'MM/YYYY')
+                AND HCA.DHPCA_TIPO = 0
+            )
+INNER JOIN ROOTSISGERH.DRI_MA_ASIG_CARGO AGC ON  (HCA.DMACA_CODIGO = AGC.DMACA_CODIGO AND AGC.DMACA_ESTADO =1 )
+INNER JOIN ROOTSISGERH.DRI_MA_ESTRUC_ZONA EZ  ON  EZ.DMEZO_CODIGO = AGC.DMEZO_CODIGO AND EZ.DMEZO_ESTADO = 1
+INNER JOIN ROOTSISGERH.DRI_MA_ESTRUC_ORG EO   ON  EO.DMEOR_CODIGO =  EZ.DMEOR_CODIGO AND EO.DMEOR_ESTADO = 1
+INNER JOIN ROOTSISGERH.DRI_MA_PARAM_ZONA PZ   ON  PZ.DMPZO_CODIGO =  EZ.DMPZO_CODIGO AND PZ.DMPZO_ESTADO = 1
+INNER JOIN ROOTSISGERH.DRI_MA_ZONA Z          ON   Z.DMZON_CODIGO =  PZ.DMZON_CODIGO AND  Z.DMZON_ESTADO = 1
+WHERE NC.DNMRU_CODIGO NOT IN (SELECT  BIR.DNMRU_CODIGO
+                          FROM DRI_NOM_BASE_IMP_RUB BIR
+                          WHERE BIR.DNMBB_ESTADO = 1)
+  AND NC.DNMPN_CODIGO = $P{P_DNMPN_CODIGO}
+  AND DMPER_NUMERO_ROL = $P{P_DMPER_NUMERO_ROL}
+  AND NC.DNMNC_VALOR !=0
+)C1
+GROUP BY ROL,DNMNC_VALOR,DNMRU_ABREVIATURA]]>
+	</queryString>
+	<field name="ROL" class="java.lang.String"/>
+	<field name="DNMNC_VALOR" class="java.math.BigDecimal"/>
+	<field name="DNMRU_ABREVIATURA" class="java.lang.String"/>
+	<variable name="V_TOTAL_VALOR" class="java.lang.Double" calculation="Sum">
+		<variableExpression><![CDATA[$F{DNMNC_VALOR}]]></variableExpression>
+	</variable>
+	<detail>
+		<band height="12" splitType="Stretch">
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="5" y="0" width="100" height="12" uuid="392c793a-7731-47de-bca6-265f61aa5886"/>
+				<textElement verticalAlignment="Middle">
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{DNMRU_ABREVIATURA}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" pattern="###0.00;-###0.00" isBlankWhenNull="true">
+				<reportElement x="105" y="0" width="60" height="12" uuid="b55989aa-b9cc-436f-b226-be5cda82b3db"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle">
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{DNMNC_VALOR}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<columnFooter>
+		<band height="17">
+			<textField isStretchWithOverflow="true" pattern="###0.00;-###0.00" isBlankWhenNull="true">
+				<reportElement x="105" y="0" width="60" height="15" uuid="2ca7d7b5-769c-4f66-994c-1504d9250ef2"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle">
+					<font size="8" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{V_TOTAL_VALOR}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="5" y="0" width="100" height="15" uuid="f362cd04-5643-4cc3-9186-46d7e4fadd7b"/>
+				<textElement verticalAlignment="Middle">
+					<font size="8" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Total:]]></text>
+			</staticText>
+		</band>
+	</columnFooter>
+</jasperReport>

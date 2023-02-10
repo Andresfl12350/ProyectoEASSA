@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="RptPlantilla" language="groovy" pageWidth="595" pageHeight="421" orientation="Landscape" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="18" bottomMargin="14" uuid="eef64cd1-edaf-4eb5-baa0-fceff5160f97">
+	<property name="ireport.zoom" value="1.6500000000000004"/>
+	<property name="ireport.x" value="0"/>
+	<property name="ireport.y" value="0"/>
+	<parameter name="SUBREPORT_DIR" class="java.lang.String" isForPrompting="false">
+		<defaultValueExpression><![CDATA["D:\\EEASA_DRI\\PROYECTOS_DRI\\SisgerhSendMail12\\resources\\"]]></defaultValueExpression>
+	</parameter>
+	<parameter name="P_DNMPN_CODIGO" class="java.lang.String">
+		<defaultValueExpression><![CDATA[]]></defaultValueExpression>
+	</parameter>
+	<parameter name="P_DMPER_NUMERO_ROL_INICIO" class="java.lang.String">
+		<defaultValueExpression><![CDATA[]]></defaultValueExpression>
+	</parameter>
+	<parameter name="P_DMPER_NUMERO_ROL_FIN" class="java.lang.String">
+		<defaultValueExpression><![CDATA[]]></defaultValueExpression>
+	</parameter>
+	<queryString>
+		<![CDATA[WITH NOMINA AS(
+    SELECT
+        NC.DMPER_CODIGO,
+        PN.DNMPN_MES,
+        PN.DNMPN_ANIO,
+        PN.DNMPN_NOMBRE_NOMINA,
+        PN.DNMPN_FECHA_GENER_NOM,
+        R.DNMRU_CODIGO,
+        CASE
+            WHEN NC.DNMRU_CODIGO IN ('RUB1') THEN  SUM(NVL(NC.DNMNC_VALOR,0))
+            WHEN NC.DNMRU_CODIGO IN ('DNMRU27') THEN  MAX(NVL(NC.DNMNC_VALOR,0))
+        END AS VALOR,
+        R.DNMRU_ABREVIATURA
+    FROM ROOTSISGERH.DRI_NOM_NOMINA_CALCUL NC
+        INNER JOIN ROOTSISGERH.DRI_MA_PERSONAL P ON (  P.DMPER_CODIGO =  NC.DMPER_CODIGO AND  P.DMPER_ESTADO = 1)
+        INNER JOIN ROOTSISGERH.DRI_NOM_RUBRO R        ON (  R.DNMRU_CODIGO =  NC.DNMRU_CODIGO AND  R.DNMRU_ESTADO = 1)
+        INNER JOIN ROOTSISGERH.DRI_NOM_PAGO_NOMINA PN ON ( NC.DNMPN_CODIGO =  PN.DNMPN_CODIGO)
+     WHERE NC.DNMPN_CODIGO = $P{P_DNMPN_CODIGO} AND NC.DNMRU_CODIGO IN ('RUB1', 'DNMRU27')
+     AND P.DMPER_NUMERO_ROL BETWEEN NVL($P{P_DMPER_NUMERO_ROL_INICIO},(SELECT  MIN (DMPER_NUMERO_ROL) FROM ROOTSISGERH.DRI_MA_PERSONAL)) AND  NVL($P{P_DMPER_NUMERO_ROL_FIN},( SELECT  MAX (DMPER_NUMERO_ROL) FROM ROOTSISGERH.DRI_MA_PERSONAL ))
+     GROUP BY NC.DMPER_CODIGO,NC.DNMRU_CODIGO,R.DNMRU_CODIGO,R.DNMRU_ABREVIATURA,PN.DNMPN_MES,PN.DNMPN_ANIO,PN.DNMPN_NOMBRE_NOMINA,PN.DNMPN_FECHA_GENER_NOM
+)
+, PERSONAL AS(
+      SELECT
+        P.DMPER_CODIGO,
+        DRLAB_DESCRIPCION,
+        P.DMPER_CODIGO AS CODIGO_PERSONA,
+        P.DMPER_NUMERO_ROL AS ROL_P,
+        P.DMPER_APELLIDO_PATER||' '||P.DMPER_APELLIDO_MATER||' '||P.DMPER_NOMBRE_PRIMERO ||' '||P.DMPER_NOMBRE_SEGUNDO AS NOMBRE,
+        DMCAR.DMCAR_DESCRIPCION||' '||ROOTSISGERH.PKG_UTILS1.SPLIT(CES.DMCES_LTR_SECUENCIA,2,'-')||
+        CASE WHEN DMCAR1.DMCAR_CODIGO IS NOT NULL THEN
+        ' - '||DMCAR1.DMCAR_DESCRIPCION||' (E)'
+        END AS CARGO,
+        COALESCE(NC.DNMPN_NOMBRE_NOMINA,' ') AS NOMINA,
+        TRIM(TO_CHAR(TO_DATE(NC.DNMPN_MES,'MM'), 'MONTH','NLS_DATE_LANGUAGE = SPANISH'))||'/'||NC.DNMPN_ANIO AS MES,
+        TO_CHAR(NC.DNMPN_FECHA_GENER_NOM,'DD/MM/YYYY') AS FECHA,
+        Z.DMZON_NOMBRE AS ZONA,
+        EZ.DMEOR_CODIGO,
+        Z.DMZON_CODIGO,
+        HCA.DHPCA_FECHA_INI_ASIG AS FECHA_INICIO,
+        HCA.DHPCA_FECHA_FIN_ASIG AS FECHA_FIN
+    FROM ROOTSISGERH.DRI_MA_PERSONAL P
+    INNER JOIN NOMINA NC ON (  P.DMPER_CODIGO =  NC.DMPER_CODIGO AND  P.DMPER_ESTADO = 1 AND NC.DNMRU_CODIGO IN ('RUB1'))
+    INNER JOIN ROOTSISGERH.DRI_HTR_PERSON_CARGO HCA ON (P.DMPER_CODIGO = HCA.DMPER_CODIGO AND HCA.DHPCA_ESTADO =1
+    AND (HCA.DHPCA_FECHA_FIN_ASIG IS NULL OR
+        TO_DATE(EXTRACT(MONTH FROM TRUNC(HCA.DHPCA_FECHA_FIN_ASIG))||'/'||EXTRACT(YEAR FROM TRUNC(HCA.DHPCA_FECHA_FIN_ASIG)),'MM/YYYY')>=
+        TO_DATE(NC.DNMPN_MES||'/'||NC.DNMPN_ANIO,'MM/YYYY')
+    )
+    AND HCA.DHPCA_FECHA_INI_ASIG IS NOT NULL  AND
+        TO_DATE(EXTRACT(MONTH FROM TRUNC(HCA.DHPCA_FECHA_INI_ASIG))||'/'||EXTRACT(YEAR FROM TRUNC(HCA.DHPCA_FECHA_INI_ASIG)),'MM/YYYY')<=
+        TO_DATE(NC.DNMPN_MES||'/'||NC.DNMPN_ANIO,'MM/YYYY')
+        AND HCA.DHPCA_TIPO = 0
+    )
+    INNER JOIN ROOTSISGERH.DRI_MA_ASIG_CARGO AGC ON  (HCA.DMACA_CODIGO = AGC.DMACA_CODIGO AND AGC.DMACA_ESTADO =1 )
+    INNER JOIN ROOTSISGERH.DRI_MA_CARGO DMCAR ON (DMCAR.DMCAR_CODIGO = AGC.DMCAR_CODIGO AND DMCAR.DMCAR_ESTADO = 1)
+    INNER JOIN ROOTSISGERH.DRI_MA_CARGO_ESCALA CES ON (AGC.DMCES_CODIGO = CES.DMCES_CODIGO AND CES.DMCES_ESTADO = 1)
+    INNER JOIN ROOTSISGERH.DRI_MA_ESCALA ESC ON (CES.DMAES_CODIGO = ESC.DMAES_CODIGO AND ESC.DMAES_ESTADO = 1)
+    INNER JOIN ROOTSISGERH.DRI_MA_ESTRUC_ZONA EZ  ON ( EZ.DMEZO_CODIGO = AGC.DMEZO_CODIGO AND EZ.DMEZO_ESTADO = 1)
+    INNER JOIN ROOTSISGERH.DRI_MA_PARAM_ZONA PZ   ON ( PZ.DMPZO_CODIGO =  EZ.DMPZO_CODIGO AND PZ.DMPZO_ESTADO = 1)
+    INNER JOIN ROOTSISGERH.DRI_MA_ZONA Z  ON (  Z.DMZON_CODIGO =  PZ.DMZON_CODIGO AND  Z.DMZON_ESTADO = 1)
+    INNER JOIN ROOTSISGERH.DRI_REGIMEN_LABORAL DRLAB ON (ESC.DRLAB_CODIGO = DRLAB.DRLAB_CODIGO AND DRLAB.DRLAB_ESTADO = 1)
+       LEFT JOIN ROOTSISGERH.DRI_HTR_PERSON_CARGO DHPCA1 ON (P.DMPER_CODIGO = DHPCA1.DMPER_CODIGO AND DHPCA1.DHPCA_ESTADO =1
+         AND (DHPCA1.DHPCA_FECHA_FIN_ASIG IS NULL OR
+            TO_DATE(EXTRACT(MONTH FROM TRUNC(DHPCA1.DHPCA_FECHA_FIN_ASIG))||'/'||EXTRACT(YEAR FROM TRUNC(DHPCA1.DHPCA_FECHA_FIN_ASIG)),'MM/YYYY')>=
+            TO_DATE(NC.DNMPN_MES||'/'||NC.DNMPN_ANIO,'MM/YYYY')
+        )
+        AND DHPCA1.DHPCA_FECHA_INI_ASIG IS NOT NULL  AND
+            TO_DATE(EXTRACT(MONTH FROM TRUNC(DHPCA1.DHPCA_FECHA_INI_ASIG))||'/'||EXTRACT(YEAR FROM TRUNC(DHPCA1.DHPCA_FECHA_INI_ASIG)),'MM/YYYY')<=
+            TO_DATE(NC.DNMPN_MES||'/'||NC.DNMPN_ANIO,'MM/YYYY')
+            AND DHPCA1.DHPCA_TIPO = 1
+        )
+        LEFT JOIN ROOTSISGERH.DRI_MA_ASIG_CARGO DMACA1 ON  (DHPCA1.DMACA_CODIGO = DMACA1.DMACA_CODIGO AND DMACA1.DMACA_ESTADO =1)
+        LEFT JOIN ROOTSISGERH.DRI_MA_CARGO DMCAR1 ON  (DMACA1.DMCAR_CODIGO = DMCAR1.DMCAR_CODIGO AND DMCAR1.DMCAR_ESTADO = 1)
+    ORDER BY ROL_P
+), MAX_FECHA AS(
+        SELECT
+           PER.DMPER_CODIGO,
+           MAX(PER.FECHA_INICIO) AS MAX_FECHA_INI
+        FROM PERSONAL PER
+        GROUP BY PER.DMPER_CODIGO
+)
+SELECT
+  PER.*,
+  ROOTSISGERH.F_ESTRUCTURA_ORIGEN(PER.DMEOR_CODIGO) DEPARTAMENTO,
+  (SELECT  NC.VALOR FROM NOMINA NC WHERE NC.DNMRU_CODIGO = 'RUB1') AS LIQUIDO,
+  (SELECT  NC.VALOR FROM NOMINA NC WHERE NC.DNMRU_CODIGO = 'DNMRU27') AS RMU
+FROM PERSONAL PER
+WHERE PER.FECHA_INICIO = (SELECT MX.MAX_FECHA_INI FROM MX.MAX_FECHA MX WHERE MX.DMPER_CODIGO=PER.DMPER_CODIGO)
+ORDER BY ZONA DESC,PER.NOMBRE]]>
+	</queryString>
+	<field name="DMPER_CODIGO" class="java.lang.String"/>
+	<field name="DRLAB_DESCRIPCION" class="java.lang.String"/>
+	<field name="CODIGO_PERSONA" class="java.lang.String"/>
+	<field name="ROL_P" class="java.lang.String"/>
+	<field name="NOMBRE" class="java.lang.String"/>
+	<field name="CARGO" class="java.lang.String"/>
+	<field name="NOMINA" class="java.lang.String"/>
+	<field name="MES" class="java.lang.String"/>
+	<field name="FECHA" class="java.lang.String"/>
+	<field name="ZONA" class="java.lang.String"/>
+	<field name="DMEOR_CODIGO" class="java.lang.String"/>
+	<field name="DMZON_CODIGO" class="java.lang.String"/>
+	<field name="FECHA_INICIO" class="oracle.sql.TIMESTAMP"/>
+	<field name="FECHA_FIN" class="oracle.sql.TIMESTAMP"/>
+	<field name="DEPARTAMENTO" class="java.lang.String"/>
+	<field name="LIQUIDO" class="java.math.BigDecimal"/>
+	<field name="RMU" class="java.math.BigDecimal"/>
+	<variable name="V_FECHA_ACTUAL" class="java.util.Date">
+		<variableExpression><![CDATA[new Date()]]></variableExpression>
+	</variable>
+	<variable name="V_TOTAL_REGISTROS" class="java.lang.Integer" calculation="Count">
+		<variableExpression><![CDATA[$V{REPORT_COUNT}]]></variableExpression>
+	</variable>
+	<variable name="VFILA_ACTUAL" class="java.math.BigDecimal" calculation="Count">
+		<variableExpression><![CDATA[new BigDecimal($V{VFILA_ACTUAL}.intValue()+1)]]></variableExpression>
+		<initialValueExpression><![CDATA[new BigDecimal(0)]]></initialValueExpression>
+	</variable>
+	<variable name="V_IMPONIBLES" class="java.lang.Double" calculation="System"/>
+	<variable name="V_NO_IMPONIBLES" class="java.lang.Double" calculation="System"/>
+	<variable name="V_DESCUENTOS" class="java.lang.Double"/>
+	<group name="ZONA">
+		<groupExpression><![CDATA[$F{ZONA}]]></groupExpression>
+	</group>
+	<group name="DEPARTAMENTO">
+		<groupExpression><![CDATA[$F{DMEOR_CODIGO}]]></groupExpression>
+	</group>
+	<group name="ROL" isStartNewPage="true" isResetPageNumber="true" keepTogether="true">
+		<groupExpression><![CDATA[$F{ROL_P}]]></groupExpression>
+		<groupHeader>
+			<band height="135">
+				<textField>
+					<reportElement positionType="Float" x="91" y="76" width="361" height="11" uuid="0314d4a0-9592-4f0b-94b9-9165d4d22cc4"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8" isBold="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{DEPARTAMENTO}]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement positionType="Float" x="18" y="96" width="73" height="11" uuid="7bb65552-3ba4-45a0-81db-1edcefa3e4bc"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[CARGO: ]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="316" y="86" width="45" height="11" uuid="bcf2e3f9-b41e-4f60-9066-4194130ebfd2"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[CODIGO:]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="18" y="86" width="73" height="11" uuid="a1cd68e9-4e3a-4bed-a936-e401448225c0"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[NOMBRES: ]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="18" y="113" width="171" height="11" uuid="abb96666-8ee7-436d-96ca-7938a5a734ed"/>
+					<box>
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="0.25" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[INGRESOS IMPONIBLES ]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="18" y="124" width="111" height="11" uuid="24e7e623-7fc0-4a87-a25c-521f4cca444a"/>
+					<box>
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="1.0" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[CONCEPTO]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="129" y="124" width="60" height="11" uuid="77a21595-a6f5-4c30-ba15-eb51f9b175f6"/>
+					<box rightPadding="10">
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="1.0" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Right" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[VALOR]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="189" y="113" width="172" height="11" uuid="8aec252b-1fd0-45f8-8756-42ea0ffa3973"/>
+					<box>
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="0.25" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[INGRESOS NO IMPONIBLES ]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="301" y="124" width="60" height="11" uuid="482981a7-6f8c-484f-bc61-3d2c0b417478"/>
+					<box rightPadding="10">
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="1.0" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Right" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[VALOR]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="189" y="124" width="112" height="11" uuid="e2cdb041-5c48-4a00-a984-c0bd1e210481"/>
+					<box>
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="1.0" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[CONCEPTO]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="361" y="113" width="173" height="11" uuid="ba14251f-d643-4cd1-8b5b-0aa5d6add4a9"/>
+					<box>
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="0.25" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[DESCUENTOS]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="474" y="124" width="60" height="11" uuid="00eb6cce-fe98-414d-a92c-2563cd6aedad"/>
+					<box rightPadding="10">
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="1.0" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Right" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[VALOR]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="361" y="124" width="113" height="11" uuid="c445a56f-0734-452a-8bdd-ba0cd58ab082"/>
+					<box>
+						<pen lineWidth="0.25" lineStyle="Dotted"/>
+						<topPen lineWidth="0.25" lineStyle="Dotted"/>
+						<leftPen lineWidth="0.25" lineStyle="Dotted"/>
+						<bottomPen lineWidth="1.0" lineStyle="Dotted"/>
+						<rightPen lineWidth="0.25" lineStyle="Dotted"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[CONCEPTO]]></text>
+				</staticText>
+				<textField>
+					<reportElement positionType="Float" x="91" y="86" width="225" height="11" uuid="8906e744-deb4-40e2-a3bd-db7a2a7e83d0"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{NOMBRE}]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" x="91" y="96" width="225" height="11" uuid="4e616c2d-e024-48a7-aed3-2d296f35a60d"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{CARGO}]]></textFieldExpression>
+				</textField>
+				<textField>
+					<reportElement positionType="Float" x="361" y="86" width="91" height="11" uuid="b546c59e-07f4-46b4-88d2-8c47377b2447"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{ROL_P}]]></textFieldExpression>
+				</textField>
+				<textField>
+					<reportElement positionType="Float" x="0" y="45" width="555" height="14" uuid="9d8d4c07-33ed-4264-86a2-bd257615d7f6"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font isBold="true"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{NOMINA}.toUpperCase()]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement positionType="Float" x="451" y="86" width="34" height="11" uuid="f284f677-7877-4362-9762-7f7f9d9a17c7"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[FECHA: ]]></text>
+				</staticText>
+				<staticText>
+					<reportElement positionType="Float" x="451" y="96" width="34" height="11" uuid="91e0fc05-2e0e-4059-a7f6-5869924de897"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8" isBold="false"/>
+					</textElement>
+					<text><![CDATA[PÁG: .]]></text>
+				</staticText>
+				<textField>
+					<reportElement positionType="Float" x="485" y="96" width="49" height="12" uuid="3483c9c4-83fa-47d8-9c95-82bb898e4ea7"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
+				</textField>
+				<textField>
+					<reportElement positionType="Float" x="485" y="86" width="49" height="11" uuid="a5026685-ef61-45de-bb78-bbab7cf2baa9"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{FECHA}]]></textFieldExpression>
+				</textField>
+				<textField>
+					<reportElement positionType="Float" x="0" y="58" width="555" height="14" uuid="27e1c127-50eb-462c-a303-c131174dba72"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font size="10" isBold="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{ZONA}+" - "+$F{MES}]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement positionType="Float" x="18" y="76" width="73" height="11" uuid="7dcdb3b3-f49d-4c6d-a2ea-83dd9452e9ed"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[DEPARTAMENTO :]]></text>
+				</staticText>
+				<subreport>
+					<reportElement x="0" y="0" width="555" height="30" uuid="98e81bce-0741-475e-a1eb-cbe0b09e1fe9"/>
+					<subreportParameter name="P_DMRFI_CODIGO">
+						<subreportParameterExpression><![CDATA["DMRFI10"]]></subreportParameterExpression>
+					</subreportParameter>
+					<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+					<subreportExpression><![CDATA[$P{SUBREPORT_DIR} + "rptEncabezadoVerISO.jasper"]]></subreportExpression>
+				</subreport>
+				<staticText>
+					<reportElement positionType="Float" x="316" y="96" width="45" height="12" uuid="62413844-d2e6-4bbf-af29-0a57d7efe52b"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<text><![CDATA[RMU: ]]></text>
+				</staticText>
+				<textField isStretchWithOverflow="true" pattern="#,##0.00;-#,##0.00" isBlankWhenNull="true">
+					<reportElement positionType="Float" x="361" y="96" width="91" height="11" uuid="d584491a-6201-4c99-8883-967e195e1b7e"/>
+					<textElement verticalAlignment="Middle">
+						<font size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{RMU}]]></textFieldExpression>
+				</textField>
+				<textField pattern="" isBlankWhenNull="false">
+					<reportElement positionType="Float" mode="Transparent" x="0" y="33" width="555" height="13" forecolor="#000000" backcolor="#FFFFFF" uuid="c5c4adaf-86ae-4800-a799-d5db9732641b"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle" rotation="None" markup="none">
+						<font fontName="SansSerif" size="10" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false" pdfFontName="Helvetica" pdfEncoding="Cp1252" isPdfEmbedded="false"/>
+						<paragraph lineSpacing="Single"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{DRLAB_DESCRIPCION}]]></textFieldExpression>
+				</textField>
+			</band>
+		</groupHeader>
+		<groupFooter>
+			<band height="44">
+				<textField pattern="###0.00;-###0.00" isBlankWhenNull="true">
+					<reportElement x="477" y="32" width="60" height="12" uuid="8443371d-f604-4a82-9a7d-2f407f61e935"/>
+					<box rightPadding="10"/>
+					<textElement textAlignment="Right" verticalAlignment="Middle">
+						<font size="9" isBold="true"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{LIQUIDO}]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement x="364" y="32" width="113" height="12" uuid="9483791e-4cb9-4efc-8cc9-9eebc5e398e0"/>
+					<box leftPadding="5"/>
+					<textElement verticalAlignment="Middle">
+						<font size="9" isBold="true"/>
+					</textElement>
+					<text><![CDATA[LIQUIDO A PAGAR :]]></text>
+				</staticText>
+				<textField pattern="#,##0.00" isBlankWhenNull="true">
+					<reportElement mode="Transparent" x="278" y="14" width="83" height="14" forecolor="#000000" backcolor="#FFFFFF" uuid="e106b8ce-73c0-4f94-8ad6-4fcb2f9b5538"/>
+					<box rightPadding="8"/>
+					<textElement textAlignment="Right" verticalAlignment="Middle" rotation="None" markup="none">
+						<font fontName="SansSerif" size="8" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false" pdfFontName="Helvetica" pdfEncoding="Cp1252" isPdfEmbedded="false"/>
+						<paragraph lineSpacing="Single"/>
+					</textElement>
+					<textFieldExpression><![CDATA[( $V{V_IMPONIBLES} > 0 ? $V{V_IMPONIBLES} : 0 )+
+( $V{V_NO_IMPONIBLES} > 0 ? $V{V_NO_IMPONIBLES} : 0 )]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement mode="Transparent" x="189" y="14" width="89" height="14" forecolor="#000000" backcolor="#FFFFFF" uuid="4a51e5cb-5e95-4b87-862a-61d9c5db3568"/>
+					<textElement textAlignment="Right" verticalAlignment="Middle" rotation="None" markup="none">
+						<font fontName="SansSerif" size="8" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false" pdfFontName="Helvetica" pdfEncoding="Cp1252" isPdfEmbedded="false"/>
+						<paragraph lineSpacing="Single"/>
+					</textElement>
+					<text><![CDATA[TOTAL INGRESOS:]]></text>
+				</staticText>
+				<textField pattern="#,##0.00" isBlankWhenNull="true">
+					<reportElement mode="Transparent" x="451" y="14" width="83" height="14" forecolor="#000000" backcolor="#FFFFFF" uuid="db79d3ef-e10d-4107-87f9-e2aaa7438ec0"/>
+					<box rightPadding="8"/>
+					<textElement textAlignment="Right" verticalAlignment="Middle" rotation="None" markup="none">
+						<font fontName="SansSerif" size="8" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false" pdfFontName="Helvetica" pdfEncoding="Cp1252" isPdfEmbedded="false"/>
+						<paragraph lineSpacing="Single"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$V{V_DESCUENTOS}]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement mode="Transparent" x="364" y="14" width="89" height="14" forecolor="#000000" backcolor="#FFFFFF" uuid="9b0d64e7-4e5b-495f-a33a-9980fbc1f34e"/>
+					<textElement textAlignment="Right" verticalAlignment="Middle" rotation="None" markup="none">
+						<font fontName="SansSerif" size="8" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false" pdfFontName="Helvetica" pdfEncoding="Cp1252" isPdfEmbedded="false"/>
+						<paragraph lineSpacing="Single"/>
+					</textElement>
+					<text><![CDATA[TOTAL DESCUENTOS:]]></text>
+				</staticText>
+			</band>
+		</groupFooter>
+	</group>
+	<detail>
+		<band height="31" splitType="Stretch">
+			<subreport>
+				<reportElement positionType="Float" x="189" y="0" width="172" height="31" uuid="49940b21-3b7d-4b11-977c-abcf984675d7"/>
+				<subreportParameter name="P_DNMPN_CODIGO">
+					<subreportParameterExpression><![CDATA[$P{P_DNMPN_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMPER_NUMERO_ROL">
+					<subreportParameterExpression><![CDATA[$F{ROL_P}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMZON_CODIGO">
+					<subreportParameterExpression><![CDATA[$F{DMZON_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMEOR_CODIGO">
+					<subreportParameterExpression><![CDATA[$F{DMEOR_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+				<returnValue subreportVariable="V_TOTAL_VALOR" toVariable="V_NO_IMPONIBLES"/>
+				<subreportExpression><![CDATA[$P{SUBREPORT_DIR} + "rptSubIngresosNoImponibles.jasper"]]></subreportExpression>
+			</subreport>
+			<subreport>
+				<reportElement positionType="Float" x="361" y="0" width="173" height="31" uuid="6fe0fa32-2fa4-412e-959d-ad2c74fb2822"/>
+				<subreportParameter name="P_DNMPN_CODIGO">
+					<subreportParameterExpression><![CDATA[$P{P_DNMPN_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMPER_NUMERO_ROL_INICIO">
+					<subreportParameterExpression><![CDATA[$F{ROL_P}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMZON_CODIGO">
+					<subreportParameterExpression><![CDATA[$F{DMZON_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMEOR_CODIGO">
+					<subreportParameterExpression><![CDATA[$F{DMEOR_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+				<returnValue subreportVariable="V_TOTAL_VALOR" toVariable="V_DESCUENTOS"/>
+				<subreportExpression><![CDATA[$P{SUBREPORT_DIR} + "rptSubDescuentos.jasper"]]></subreportExpression>
+			</subreport>
+			<subreport>
+				<reportElement positionType="Float" x="18" y="0" width="171" height="31" uuid="7ab66c5e-3fd5-45bd-b904-6cca08bbdbb2"/>
+				<subreportParameter name="P_DNMPN_CODIGO">
+					<subreportParameterExpression><![CDATA[$P{P_DNMPN_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMPER_NUMERO_ROL">
+					<subreportParameterExpression><![CDATA[$F{ROL_P}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMZON_CODIGO">
+					<subreportParameterExpression><![CDATA[$F{DMZON_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="P_DMEOR_CODIGO">
+					<subreportParameterExpression><![CDATA[$F{DMEOR_CODIGO}]]></subreportParameterExpression>
+				</subreportParameter>
+				<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+				<returnValue subreportVariable="V_TOTAL_VALOR" toVariable="V_IMPONIBLES"/>
+				<subreportExpression><![CDATA[$P{SUBREPORT_DIR} + "rptSubIngresosImponibles.jasper"]]></subreportExpression>
+			</subreport>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="15">
+			<subreport>
+				<reportElement x="0" y="0" width="555" height="10" uuid="532d0a10-3f42-4774-82f2-87446bc45ab2"/>
+				<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+				<subreportExpression><![CDATA[$P{SUBREPORT_DIR} + "rptPieRetrato.jasper"]]></subreportExpression>
+			</subreport>
+		</band>
+	</pageFooter>
+</jasperReport>
